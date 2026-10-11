@@ -36,7 +36,7 @@ object Protocol {
      * Servidor que já vem preenchido no app. Coloque aqui o endereço do seu servidor
      * (ex.: "wss://comunicador.sua-conta.workers.dev") e a equipe nem precisa ver esse campo.
      */
-    const val DEFAULT_SERVER = ""
+    const val DEFAULT_SERVER = "webrtc://comunicador.escrevaprofernando.workers.dev"
 
     const val HELLO: Byte = 1
     const val AUDIO: Byte = 2
