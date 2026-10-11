@@ -4,7 +4,7 @@
 // O protocolo é o mesmo do servidor próprio e da central no celular.
 
 import { DurableObject } from "cloudflare:workers";
-import { invitePage } from "./convite.js";
+import { invitePage, homePage } from "./convite.js";
 import OG_IMAGEM from "./publico/og-imagem.png";
 import ICONE_192 from "./publico/icone-192.png";
 import FAVICON_32 from "./publico/favicon-32.png";
@@ -53,7 +53,8 @@ export default {
     }
 
     if (url.pathname === "/") {
-      return new Response("Comunicador: servidor no ar.\n", { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+      // Página principal: apresenta o app e o link para baixar.
+      return new Response(homePage(env.APP_URL || "", url.origin), { headers: { "Content-Type": "text/html; charset=utf-8" } });
     }
     return new Response("Não encontrado\n", { status: 404 });
   },

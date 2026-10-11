@@ -9,7 +9,7 @@
 
 const dgram = require('dgram');
 const http = require('http');
-const { invitePage } = require('./convite');
+const { invitePage, homePage } = require('./convite');
 
 const PORT = Number(process.env.PORT) || 50505;
 const HTTP_PORT = Number(process.env.HTTP_PORT) || 8080;
@@ -202,8 +202,12 @@ http.createServer((req, res) => {
   if (path === '/') {
     let people = 0;
     for (const r of rooms.values()) people += r.members.size;
-    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-    return res.end(`Comunicador: servidor no ar. Canais ativos: ${rooms.size}. Pessoas: ${people}.\n`);
+    // Página principal: apresenta o app; no rodapé, o estado do servidor.
+    const host = PUBLIC_HOST || (req.headers.host || '').split(':')[0];
+    const html = homePage(APP_URL, `http://${host}:${HTTP_PORT}`,
+      `Servidor no ar. Canais ativos: ${rooms.size}. Pessoas: ${people}.`);
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    return res.end(html);
   }
   res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
   res.end('Não encontrado\n');
