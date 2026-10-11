@@ -5,7 +5,7 @@ compatibility_date = "2025-02-24"
 
 # Opcional: link para baixar o app, mostrado na página de convite.
 [vars]
-APP_URL = ""
+APP_URL = "https://github.com/fernangcortes/comunicador/releases/latest/download/comunicador.apk"
 
 # Imagens da marca, embutidas no Worker
 [[rules]]
