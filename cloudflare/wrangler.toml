@@ -1,0 +1,21 @@
+# Comunicador — central na Cloudflare (Worker + Durable Object)
+name = "comunicador"
+main = "src/index.js"
+compatibility_date = "2025-02-24"
+
+# Opcional: link para baixar o app, mostrado na página de convite.
+[vars]
+APP_URL = ""
+
+# Imagens da marca, embutidas no Worker
+[[rules]]
+type = "Data"
+globs = ["**/*.png"]
+
+[[durable_objects.bindings]]
+name = "CANAL"
+class_name = "Canal"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Canal"]

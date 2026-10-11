@@ -1,0 +1,8 @@
+{
+  "name": "comunicador-servidor",
+  "version": "0.3.0",
+  "description": "Central do Comunicador na internet (servidor próprio / Oracle Cloud)",
+  "main": "servidor.js",
+  "scripts": { "start": "node servidor.js" },
+  "engines": { "node": ">=12" }
+}

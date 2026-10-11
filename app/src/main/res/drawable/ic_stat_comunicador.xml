@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Gerado por marca/gerar_marca.py -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M0.706,12.000 a4.588,4.588 0 1,0 9.176,0 a4.588,4.588 0 1,0 -9.176,0"/>
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="2.353" android:strokeLineCap="round" android:pathData="M11.53,5.76 A8.823529411764707,8.823529411764707 0 0 1 11.53,18.24"/>
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="2.353" android:strokeLineCap="round" android:pathData="M14.53,2.77 A13.058823529411764,13.058823529411764 0 0 1 14.53,21.23"/>
+</vector>

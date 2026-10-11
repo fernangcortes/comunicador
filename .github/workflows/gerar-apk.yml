@@ -1,0 +1,52 @@
+# Gera o APK do Comunicador na nuvem, sem precisar de Android Studio.
+#  - A cada envio para a branch main: o APK fica em Actions > (a execução) > Artifacts.
+#  - Ao criar uma tag v0.5, v0.6...: o APK vira uma "Release" com link fixo de download,
+#    que pode ir no WhatsApp ou na página de convite:
+#    https://github.com/SEU_USUARIO/SEU_REPOSITORIO/releases/latest/download/comunicador.apk
+name: Gerar APK
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+
+      - name: Compilar o app
+        run: |
+          gradle assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk comunicador.apk
+
+      - name: Guardar o APK desta execução
+        uses: actions/upload-artifact@v4
+        with:
+          name: comunicador-apk
+          path: comunicador.apk
+          retention-days: 30
+
+      - name: Publicar como Release (só em tags v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: comunicador.apk
+          generate_release_notes: true
