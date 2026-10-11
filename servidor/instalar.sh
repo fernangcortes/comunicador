@@ -16,10 +16,12 @@ echo "2/4  Copiando o servidor para /opt/comunicador…"
 DIR=/opt/comunicador
 mkdir -p "$DIR"
 cp servidor.js convite.js package.json "$DIR/"
+cp -r publico "$DIR/"  # imagens da marca (prévia do convite, ícone)
 id -u comunicador >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin comunicador
 
 PUBLIC_IP=$(curl -s --max-time 5 https://api.ipify.org || true)
 APP_URL_VALUE="${APP_URL:-}"
+ADMIN_CODE_VALUE="${ADMIN_CODE:-}"
 
 cat > /etc/systemd/system/comunicador.service <<EOF
 [Unit]
@@ -31,6 +33,7 @@ Wants=network-online.target
 ExecStart=/usr/bin/node $DIR/servidor.js
 Environment=PUBLIC_HOST=$PUBLIC_IP
 Environment=APP_URL=$APP_URL_VALUE
+Environment="ADMIN_CODE=$ADMIN_CODE_VALUE"
 User=comunicador
 Restart=always
 RestartSec=2

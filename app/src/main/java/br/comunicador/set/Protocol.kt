@@ -9,8 +9,10 @@ import java.nio.ByteOrder
  * Protocolo do comunicador (versão 2). O mesmo formato vale para os três caminhos:
  * central no celular (UDP, Wi-Fi local), servidor próprio (UDP, internet) e Cloudflare (WebSocket).
  *
- *  HELLO  participante -> central   [1][tamNome][nome][tamCódigo][código][tamSenha][senha][opções]
+ *  HELLO  participante -> central   [1][tamNome][nome][tamCódigo][código][tamProva][prova][opções][tamAdmin][admin]
+ *         prova: "prova de entrada" derivada da senha do canal (Seguranca.kt); a senha nunca viaja.
  *         opções: bit 1 = tem prioridade (direção/produção)
+ *         admin (opcional): prova do código de administrador; a central pode exigir para criar canal
  *  AUDIO  nos dois sentidos         [2][id u16][seq u16][codec u8][dados]
  *  ROSTER central -> participante   [3][seuId u16][qtd]{[id u16][estado u8][tamNome][nome]}
  *         estado: bit 0 = falando, bit 1 = tem prioridade
@@ -18,10 +20,10 @@ import java.nio.ByteOrder
  *  TALK   participante -> central   [5][1 = começou a falar, 0 = parou]
  *  RTC_PUB  participante -> central (só WebRTC)  [6][tam][sessão no SFU][tam][nome da trilha]
  *  RTC_LIST central -> participantes (só WebRTC) [7][qtd]{[id u16][tam][sessão][tam][trilha]}
- *  ERROR  central -> participante   [8][motivo]  (1 = senha do canal errada)
+ *  ERROR  central -> participante   [8][motivo]  (1 = senha do canal errada, 2 = só administrador cria canal)
  *  RTC_UNPUB participante -> central (só WebRTC) [9]  ("minha voz agora vem pelo WebSocket")
  *
- * Codecs do áudio: 0 = PCM, 1 = ADPCM, 2 = Opus.
+ * Codecs do áudio: 0 = PCM, 1 = ADPCM, 2 = Opus. Bit 0x80 = áudio cifrado de ponta a ponta (Seguranca.kt).
  *
  * Quem manda áudio usa id 0; a central troca pelo id de quem falou antes de repassar.
  */
@@ -48,6 +50,7 @@ object Protocol {
     const val ERROR: Byte = 8
     const val RTC_UNPUB: Byte = 9
     const val ERR_WRONG_KEY = 1
+    const val ERR_NEED_ADMIN = 2
 
     const val CODEC_PCM: Byte = 0
     const val CODEC_ADPCM: Byte = 1
@@ -67,12 +70,14 @@ object Protocol {
         return t.toByteArray(Charsets.UTF_8)
     }
 
-    fun hello(name: String, code: String = "", key: String = "", priority: Boolean = false): ByteArray {
+    fun hello(name: String, code: String = "", key: String = "", priority: Boolean = false, admin: String = ""): ByteArray {
         val n = utf8(name, 60)
         val c = utf8(code, 40)
         val k = utf8(key, 40)
-        return byteArrayOf(HELLO, n.size.toByte()) + n + byteArrayOf(c.size.toByte()) + c +
+        val a = utf8(admin, 40)
+        val base = byteArrayOf(HELLO, n.size.toByte()) + n + byteArrayOf(c.size.toByte()) + c +
             byteArrayOf(k.size.toByte()) + k + byteArrayOf(if (priority) 2 else 0)
+        return if (a.isEmpty()) base else base + byteArrayOf(a.size.toByte()) + a
     }
 
     fun parseHello(data: ByteArray, length: Int): Hello {

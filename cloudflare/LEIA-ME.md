@@ -55,4 +55,18 @@ Os dois modos convivem no mesmo servidor e até no mesmo canal: `wss://…` usa 
 
 **Custo do WebRTC:** o Realtime cobra US$ 0,05 por GB enviado aos celulares, com os primeiros 1.000 GB de cada mês grátis. Com Opus, uma pessoa gasta dezenas de MB por diária; na prática, custo zero. O Durable Object, nesse modo, quase não trabalha (só a lista de pessoas), então também fica bem dentro do plano grátis.
 
-**Senha do canal:** cada canal tem uma senha, criada pelo app de quem abriu o canal e levada no convite. Quem não tem a senha não entra, não ouve, e o Worker não libera o Realtime para ele. Uma pessoa que estude o app ainda conseguiria abrir um canal próprio no seu servidor; se isso um dia importar, o próximo passo é uma senha do servidor.
+**Senha do canal:** cada canal tem uma senha, criada pelo app de quem abriu o canal e levada no convite. A senha nunca sai do celular: o Worker recebe só uma "prova" calculada a partir dela. Quem não tem a senha não entra, não ouve, e o Worker não libera o Realtime para ele. Na reserva pelo WebSocket, a voz vai cifrada de ponta a ponta e o Worker só repassa.
+
+## Código de administrador (recomendado)
+
+Sem ele, qualquer pessoa com o app consegue abrir canais na sua central e gastar a cota grátis. Com ele, só quem tem o código cria canais novos; quem entra por convite não precisa de nada.
+
+```
+npx wrangler secret put ADMIN_CODE
+```
+
+Escolha um código que só a produção saiba e digite o mesmo no app: 7 toques no título "Comunicador" → Opções avançadas → Código de administrador.
+
+## Privacidade
+
+A página `/privacidade` (ex.: `https://comunicador.sua-conta.workers.dev/privacidade`) é a política de privacidade do app, com endereço público, como a Google Play exige.

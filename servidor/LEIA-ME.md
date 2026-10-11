@@ -49,6 +49,8 @@ Funciona na rede local. Para alguém de fora entrar, o computador precisa estar 
 - Reiniciar: `sudo systemctl restart comunicador`
 - Atualizar: copie a pasta nova e rode `sudo bash instalar.sh` de novo.
 - Link para baixar o app na página de convite: `sudo APP_URL="https://seu-link" bash instalar.sh`
+- Código de administrador (só quem tem cria canais): `sudo ADMIN_CODE="seu-código" bash instalar.sh`. Digite o mesmo no app: 7 toques no título → Opções avançadas.
+- Testes: `node --test teste.mjs`
 
 ## Limites
 
@@ -56,4 +58,4 @@ Funciona na rede local. Para alguém de fora entrar, o computador precisa estar 
 
 ## Senha do canal
 
-A primeira pessoa que entra num canal define a senha (o app gera e põe no convite). Quem chegar depois com outra senha recebe "senha errada" e não ouve nada. A senha de um canal vazio é lembrada por 7 dias.
+A primeira pessoa que entra num canal define a senha (o app gera e põe no convite). A senha nunca sai do celular: o servidor recebe só uma "prova" calculada a partir dela, e a voz vai cifrada de ponta a ponta (o servidor só repassa, sem conseguir ouvir). Quem chegar depois com outra senha recebe "senha errada" e não ouve nada. A prova de um canal vazio é lembrada por 7 dias.

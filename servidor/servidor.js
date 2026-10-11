@@ -5,19 +5,22 @@
 //   node servidor.js
 //
 // Portas: UDP 50505 (voz) e TCP 8080 (página de convite). Variáveis opcionais:
-//   PORT, HTTP_PORT, PUBLIC_HOST (IP ou nome público), APP_URL (link para baixar o app)
+//   PORT, HTTP_PORT, PUBLIC_HOST (IP ou nome público), APP_URL (link para baixar o app),
+//   ADMIN_CODE (se preenchido, só quem tem este código cria canais; quem entra por convite não precisa)
 
 const dgram = require('dgram');
+const crypto = require('crypto');
 const http = require('http');
-const { invitePage, homePage } = require('./convite');
+const { invitePage, homePage, privacyPage } = require('./convite');
 
 const PORT = Number(process.env.PORT) || 50505;
 const HTTP_PORT = Number(process.env.HTTP_PORT) || 8080;
 const PUBLIC_HOST = process.env.PUBLIC_HOST || '';
 const APP_URL = process.env.APP_URL || '';
+const ADMIN_CODE = process.env.ADMIN_CODE || '';
 
 const HELLO = 1, AUDIO = 2, ROSTER = 3, BYE = 4, TALK = 5, ERROR = 8;
-const ERR_WRONG_KEY = 1;
+const ERR_WRONG_KEY = 1, ERR_NEED_ADMIN = 2;
 const KEY_TTL = 7 * 24 * 3600 * 1000; // a senha de um canal vazio é lembrada por 7 dias
 const MEMBER_TIMEOUT = 8000;
 const MAX_PER_ROOM = 60;
@@ -37,7 +40,9 @@ function cut(str, maxBytes) {
   return Buffer.from(s, 'utf8');
 }
 
-// HELLO: [1][tam][nome][tam][código][tam][senha][opções]  (opções: bit 1 = prioridade)
+// HELLO: [1][tam][nome][tam][código][tam][prova de entrada][opções][tam][prova de admin]
+// (opções: bit 1 = prioridade). A prova de entrada sai da senha do canal, que nunca viaja;
+// o áudio vai cifrado de ponta a ponta e é só repassado. Detalhes em Protocol.kt e Seguranca.kt.
 function parseHello(b) {
   if (b.length < 2) return null;
   const fields = [];
@@ -48,12 +53,24 @@ function parseHello(b) {
     i += 1 + n;
   }
   const flags = i < b.length ? b[i] : 0;
+  i += 1;
+  let admin = '';
+  if (i < b.length) {
+    const n = Math.min(b[i], b.length - i - 1);
+    admin = b.toString('utf8', i + 1, i + 1 + n);
+  }
   return {
     name: fields[0] || 'Sem nome',
     code: (fields[1] || '').toUpperCase(),
     key: fields[2] || '',
     priority: (flags & 2) !== 0,
+    admin,
   };
+}
+
+// Prova de administrador: HMAC-SHA256(código de admin, "comunicador/admin/CÓDIGO"), 32 primeiros hex.
+function adminProof(code) {
+  return crypto.createHmac('sha256', ADMIN_CODE).update(`comunicador/admin/${code}`).digest('hex').slice(0, 32);
 }
 
 function talkingNow(m, now) {
@@ -108,6 +125,11 @@ sock.on('message', (b, rinfo) => {
       if (!h || !CODE_RE.test(h.code)) return;
       // Senha do canal: a primeira pessoa define; as outras precisam da mesma (vem no convite).
       const saved = keys.get(h.code);
+      // Canal novo: com ADMIN_CODE configurado, só quem tem o código de administrador cria.
+      if (!saved && ADMIN_CODE && h.admin !== adminProof(h.code)) {
+        sock.send(Buffer.from([ERROR, ERR_NEED_ADMIN]), rinfo.port, rinfo.address);
+        return;
+      }
       if (saved && saved.key !== h.key) {
         sock.send(Buffer.from([ERROR, ERR_WRONG_KEY]), rinfo.port, rinfo.address);
         return;
@@ -198,6 +220,10 @@ http.createServer((req, res) => {
       res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
       return res.end(data);
     } catch { /* cai no 404 */ }
+  }
+  if (path === '/privacidade') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    return res.end(privacyPage());
   }
   if (path === '/') {
     let people = 0;

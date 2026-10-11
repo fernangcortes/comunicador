@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 520" width="800" height="520" role="img" aria-label="Quatro caminhos para a voz: Wi-Fi local, servidor próprio, Cloudflare por WebSocket e Cloudflare por WebRTC">
+  <style>
+    text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: #eef1f3; }
+    .t { font-size: 22px; font-weight: 800; }
+    .h { font-size: 15px; font-weight: 700; fill: #f2a516; }
+    .b { font-size: 15px; font-weight: 700; }
+    .s { font-size: 12.5px; fill: #a3abb3; }
+    .box { fill: #2d3238; stroke: #3e454d; stroke-width: 1.5; }
+    .cen { fill: #2d3238; stroke: #e5323f; stroke-width: 2; }
+    .ln { stroke: #a3abb3; stroke-width: 2; fill: none; }
+    .dash { stroke-dasharray: 6 6; }
+  </style>
+  <defs>
+    <marker id="seta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#a3abb3"/>
+    </marker>
+  </defs>
+  <rect width="800" height="520" rx="18" fill="#22262b"/>
+  <text x="32" y="46" class="t">Um app, quatro caminhos para a voz</text>
+  <text x="32" y="70" class="s">O endereço do servidor (que já vem no app ou no convite) decide o caminho. A equipe não escolhe nada.</text>
+
+  <!-- 1. Wi-Fi local -->
+  <text x="32" y="112" class="h">1 · Wi-Fi local, sem internet</text>
+  <rect x="32" y="124" width="180" height="56" rx="10" class="box"/>
+  <text x="122" y="150" text-anchor="middle" class="b">Celulares da equipe</text>
+  <text x="122" y="168" text-anchor="middle" class="s">com a senha da central</text>
+  <path d="M212,152 L522,152" class="ln" marker-start="url(#seta)" marker-end="url(#seta)"/>
+  <text x="367" y="142" text-anchor="middle" class="s">hotspot ou roteador · UDP · voz cifrada</text>
+  <rect x="528" y="124" width="240" height="56" rx="10" class="cen"/>
+  <text x="648" y="150" text-anchor="middle" class="b">Um celular é a central</text>
+  <text x="648" y="168" text-anchor="middle" class="s">"Criar canal neste celular"</text>
+
+  <!-- 2. Servidor próprio -->
+  <text x="32" y="222" class="h">2 · Servidor próprio</text>
+  <rect x="32" y="234" width="180" height="56" rx="10" class="box"/>
+  <text x="122" y="260" text-anchor="middle" class="b">Celulares da equipe</text>
+  <text x="122" y="278" text-anchor="middle" class="s">cada um no seu 4G</text>
+  <path d="M212,262 L522,262" class="ln" marker-start="url(#seta)" marker-end="url(#seta)"/>
+  <text x="367" y="252" text-anchor="middle" class="s">internet · UDP · voz cifrada de ponta a ponta</text>
+  <rect x="528" y="234" width="240" height="56" rx="10" class="cen"/>
+  <text x="648" y="260" text-anchor="middle" class="b">VPS ou Oracle Cloud</text>
+  <text x="648" y="278" text-anchor="middle" class="s">pasta servidor/ (Node.js)</text>
+
+  <!-- 3. Cloudflare WebSocket -->
+  <text x="32" y="332" class="h">3 · Cloudflare (WebSocket)</text>
+  <rect x="32" y="344" width="180" height="56" rx="10" class="box"/>
+  <text x="122" y="370" text-anchor="middle" class="b">Celulares da equipe</text>
+  <text x="122" y="388" text-anchor="middle" class="s">entram pelo convite</text>
+  <path d="M212,372 L522,372" class="ln" marker-start="url(#seta)" marker-end="url(#seta)"/>
+  <text x="367" y="362" text-anchor="middle" class="s">wss:// · passa por qualquer rede</text>
+  <rect x="528" y="344" width="240" height="56" rx="10" class="cen"/>
+  <text x="648" y="370" text-anchor="middle" class="b">Worker + Durable Object</text>
+  <text x="648" y="388" text-anchor="middle" class="s">um "canal" por código</text>
+
+  <!-- 4. Cloudflare WebRTC -->
+  <text x="32" y="442" class="h">4 · Cloudflare WebRTC (padrão do app)</text>
+  <rect x="32" y="454" width="180" height="56" rx="10" class="box"/>
+  <text x="122" y="480" text-anchor="middle" class="b">Celulares da equipe</text>
+  <text x="122" y="498" text-anchor="middle" class="s">voz Opus, ritmo adaptativo</text>
+  <path d="M212,482 L522,482" class="ln" marker-start="url(#seta)" marker-end="url(#seta)"/>
+  <text x="367" y="472" text-anchor="middle" class="s">webrtc:// · se falhar em 20 s, cai no caminho 3</text>
+  <rect x="528" y="454" width="240" height="56" rx="10" class="cen"/>
+  <text x="648" y="480" text-anchor="middle" class="b">Cloudflare Realtime (SFU)</text>
+  <text x="648" y="498" text-anchor="middle" class="s">a lista de pessoas fica no Worker</text>
+  <path d="M770,400 C790,420 790,440 770,458" class="ln dash"/>
+</svg>

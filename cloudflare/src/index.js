@@ -4,7 +4,7 @@
 // O protocolo é o mesmo do servidor próprio e da central no celular.
 
 import { DurableObject } from "cloudflare:workers";
-import { invitePage, homePage } from "./convite.js";
+import { invitePage, homePage, privacyPage } from "./convite.js";
 import OG_IMAGEM from "./publico/og-imagem.png";
 import ICONE_192 from "./publico/icone-192.png";
 import FAVICON_32 from "./publico/favicon-32.png";
@@ -13,7 +13,7 @@ import FAVICON_32 from "./publico/favicon-32.png";
 const ASSETS = { "/og-imagem.png": OG_IMAGEM, "/icone-192.png": ICONE_192, "/favicon.ico": FAVICON_32 };
 
 const HELLO = 1, AUDIO = 2, ROSTER = 3, BYE = 4, TALK = 5, RTC_PUB = 6, RTC_LIST = 7, ERROR = 8, RTC_UNPUB = 9;
-const ERR_WRONG_KEY = 1;
+const ERR_WRONG_KEY = 1, ERR_NEED_ADMIN = 2;
 const CODE = "([A-Za-z0-9]{4,12})";
 const MAX_PER_ROOM = 60;
 
@@ -52,6 +52,9 @@ export default {
       return new Response(ASSETS[url.pathname], { headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" } });
     }
 
+    if (url.pathname === "/privacidade") {
+      return new Response(privacyPage(url.origin), { headers: { "Content-Type": "text/html; charset=utf-8" } });
+    }
     if (url.pathname === "/") {
       // Página principal: apresenta o app e o link para baixar.
       return new Response(homePage(env.APP_URL || "", url.origin), { headers: { "Content-Type": "text/html; charset=utf-8" } });
@@ -161,6 +164,13 @@ async function rtc(env, action, request) {
   return json({ erro: "Não encontrado" }, 404);
 }
 
+// Prova de administrador: HMAC-SHA256(código de admin, "comunicador/admin/CÓDIGO"), 32 primeiros hex.
+async function adminProof(adminCode, code) {
+  const k = await crypto.subtle.importKey("raw", encoder.encode(adminCode), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", k, encoder.encode(`comunicador/admin/${code}`)));
+  return [...sig].map((x) => x.toString(16).padStart(2, "0")).join("").slice(0, 32);
+}
+
 const decoder = new TextDecoder();
 const encoder = new TextEncoder();
 
@@ -192,7 +202,8 @@ export class Canal extends DurableObject {
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ id, name: "", talking: false, joined: false });
+    const code = new URL(request.url).pathname.split("/").pop().toUpperCase(); // /ws/CÓDIGO
+    server.serializeAttachment({ id, name: "", talking: false, joined: false, code });
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -204,7 +215,9 @@ export class Canal extends DurableObject {
 
     switch (b[0]) {
       case HELLO: {
-        // [1][tam][nome][tam][código][tam][senha][opções]
+        // [1][tam][nome][tam][código][tam][prova de entrada][opções][tam][prova de admin]
+        // A prova de entrada sai da senha do canal, que nunca viaja; o áudio vai cifrado
+        // de ponta a ponta e só é repassado. Detalhes em Protocol.kt e Seguranca.kt.
         const fields = [];
         let i = 1;
         for (let f = 0; f < 3 && i < b.length; f++) {
@@ -213,10 +226,20 @@ export class Canal extends DurableObject {
           i += 1 + n;
         }
         const flags = i < b.length ? b[i] : 0;
+        i += 1;
+        const admin = i < b.length ? decoder.decode(b.subarray(i + 1, i + 1 + Math.min(b[i], b.length - i - 1))) : "";
         const key = fields[2] || "";
         // Senha do canal: a primeira pessoa define; quem chega depois precisa da mesma.
         const saved = await this.ctx.storage.get("key");
-        if (saved === undefined) await this.ctx.storage.put("key", key);
+        if (saved === undefined) {
+          // Canal novo: com o segredo ADMIN_CODE configurado, só quem tem o código de administrador cria.
+          const code = me.code || "";
+          if (this.env.ADMIN_CODE && admin !== (await adminProof(this.env.ADMIN_CODE.trim(), code))) {
+            try { ws.send(new Uint8Array([ERROR, ERR_NEED_ADMIN])); } catch {}
+            return;
+          }
+          await this.ctx.storage.put("key", key);
+        }
         else if (saved !== key) {
           try { ws.send(new Uint8Array([ERROR, ERR_WRONG_KEY])); } catch {}
           return;

@@ -5,22 +5,24 @@ plugins {
 
 android {
     namespace = "br.comunicador.set"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "br.comunicador.set"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 36
         // O WebRTC traz bibliotecas nativas; só as dos celulares atuais (ARM) para o APK não pesar.
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
         versionCode = 8
         versionName = "0.8"
     }
 
-    // Chave de assinatura fixa, guardada no projeto. Sem ela, cada APK gerado no GitHub
-    // sairia com uma chave diferente e o celular recusaria instalar a versão nova por cima
-    // da antiga. É uma chave de TESTE: antes de publicar na Google Play, troque por uma
-    // chave guardada fora do repositório.
+    // Chave definitiva: no GitHub vem dos segredos (variáveis de ambiente); no computador,
+    // de comunicadorKeystore/comunicadorKeystorePassword no gradle.properties do usuário.
+    // Ela fica FORA do repositório. Sem ela, o APK sai com a chave de teste (que está no
+    // repositório de propósito), e não instala por cima de uma versão da Release.
+    val chave = System.getenv("COMUNICADOR_KEYSTORE") ?: findProperty("comunicadorKeystore") as String?
+    val senhaChave = System.getenv("COMUNICADOR_KEYSTORE_PASSWORD") ?: findProperty("comunicadorKeystorePassword") as String?
     signingConfigs {
         create("teste") {
             storeFile = file("comunicador-teste.keystore")
@@ -28,6 +30,17 @@ android {
             keyAlias = "comunicador"
             keyPassword = "comunicador"
         }
+        if (chave != null && senhaChave != null) {
+            create("definitiva") {
+                storeFile = file(chave)
+                storePassword = senhaChave
+                keyAlias = "comunicador"
+                keyPassword = senhaChave
+            }
+        }
+    }
+    val assinatura = signingConfigs.findByName("definitiva") ?: signingConfigs.getByName("teste").also {
+        logger.warn("Aviso: chave definitiva não encontrada; o APK de release sai com a chave de TESTE.")
     }
 
     buildTypes {
@@ -36,16 +49,13 @@ android {
         }
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("teste")
+            signingConfig = assinatura
         }
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-    kotlinOptions {
-        jvmTarget = "17"
     }
     // Avisos do verificador não impedem gerar o APK de teste.
     lint {
@@ -54,7 +64,15 @@ android {
     }
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
+}
+
 dependencies {
     // Motor WebRTC (o mesmo usado pelo LiveKit), para a voz pelo Cloudflare Realtime.
     implementation("io.github.webrtc-sdk:android:137.7151.05")
+    // Testes que rodam no computador: protocolo, ADPCM e criptografia.
+    testImplementation("junit:junit:4.13.2")
 }

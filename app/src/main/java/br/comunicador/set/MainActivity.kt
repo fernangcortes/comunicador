@@ -3,6 +3,7 @@ package br.comunicador.set
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -21,6 +22,7 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsets
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
@@ -29,6 +31,7 @@ import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
+import android.widget.Toast
 
 class MainActivity : Activity() {
 
@@ -56,6 +59,10 @@ class MainActivity : Activity() {
     private lateinit var ipInput: EditText
     private lateinit var joinError: TextView
     private lateinit var serverInput: EditText
+    private lateinit var adminInput: EditText
+    private lateinit var advanced: LinearLayout
+    private var titleTaps = 0
+    private var lastTitleTap = 0L
     private lateinit var codeInput: EditText
     private lateinit var inviteBtn: Button
     private lateinit var pttStatus: TextView
@@ -89,8 +96,12 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = bg
-        window.navigationBarColor = bg
+        if (Build.VERSION.SDK_INT < 35) { // no Android 15+ as barras são transparentes e mostram o fundo do app
+            @Suppress("DEPRECATION")
+            window.statusBarColor = bg
+            @Suppress("DEPRECATION")
+            window.navigationBarColor = bg
+        }
         discovery = Discovery(this)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -100,6 +111,15 @@ class MainActivity : Activity() {
         roomScreen = buildRoomScreen()
         root.addView(joinScreen, ViewGroup.LayoutParams(-1, -1))
         root.addView(roomScreen, ViewGroup.LayoutParams(-1, -1))
+        // Android 15+ desenha o app por baixo da barra de status e da de navegação:
+        // afasta o conteúdo delas (e do teclado), para nada ficar escondido.
+        if (Build.VERSION.SDK_INT >= 30) {
+            root.setOnApplyWindowInsetsListener { v, insets ->
+                val b = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout() or WindowInsets.Type.ime())
+                v.setPadding(b.left, b.top, b.right, b.bottom)
+                WindowInsets.CONSUMED
+            }
+        }
         setContentView(root)
         askPermissions()
         handleInvite(intent)
@@ -125,7 +145,8 @@ class MainActivity : Activity() {
 
     private fun buildJoinScreen(): View {
         val col = column(24, 40)
-        col.addView(label("Comunicador", 30f, fg, bold = true))
+        // 7 toques no título abrem (ou fecham) as opções avançadas, como o "modo desenvolvedor" do Android.
+        col.addView(label("Comunicador", 30f, fg, bold = true).apply { setOnClickListener { onTitleTap() } })
         col.addView(label("Todos no mesmo Wi-Fi, ou no hotspot do celular que for a central.", 15f, muted).withTop(6))
 
         col.addView(label("Seu nome ou função", 15f, fg, bold = true).withTop(28))
@@ -173,19 +194,36 @@ class MainActivity : Activity() {
         col.addView(primary("Entrar no canal") { joinInternet() }.withTop(10))
         inviteBtn = secondary("Criar canal novo e convidar a equipe") { createAndInvite() }
         col.addView(inviteBtn.withTop(8))
-        col.addView(label("Servidor", 15f, fg, bold = true).withTop(14))
+
+        // ---------- Opções avançadas (escondidas) ----------
+        advanced = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = if (prefs.getBoolean("avancado", false)) View.VISIBLE else View.GONE
+        }
+        advanced.addView(label("Opções avançadas", 20f, fg, bold = true).withTop(28))
+        advanced.addView(label("Para a produção. Toque 7 vezes em \"Comunicador\" para esconder de novo.", 13f, muted).withTop(4))
+        advanced.addView(label("Servidor", 15f, fg, bold = true).withTop(14))
         serverInput = input("wss://… ou IP do servidor").apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
             setText(prefs.getString("server", null) ?: Protocol.DEFAULT_SERVER)
             textSize = 14f
         }
-        col.addView(serverInput.withTop(8))
-        col.addView(label("Cloudflare: wss://nome.sua-conta.workers.dev   ·   Cloudflare com WebRTC: webrtc://nome.sua-conta.workers.dev   ·   Servidor próprio ou Oracle: o IP dele.", 12f, muted).withTop(4))
+        advanced.addView(serverInput.withTop(8))
+        advanced.addView(label("Cloudflare: wss://nome.sua-conta.workers.dev   ·   Cloudflare com WebRTC: webrtc://nome.sua-conta.workers.dev   ·   Servidor próprio ou Oracle: o IP dele.", 12f, muted).withTop(4))
+        advanced.addView(secondary("Voltar ao servidor padrão") { serverInput.setText(Protocol.DEFAULT_SERVER) }.withTop(8))
+        advanced.addView(label("Código de administrador", 15f, fg, bold = true).withTop(14))
+        adminInput = input("só para quem cria canais").apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setText(prefs.getString("admin", ""))
+        }
+        advanced.addView(adminInput.withTop(8))
+        advanced.addView(label("A central só deixa criar canal novo com este código. Quem entra por convite não precisa dele.", 12f, muted).withTop(4))
+        col.addView(advanced)
 
         // ---------- Sem internet ----------
         col.addView(label("Sem internet: Wi-Fi do set", 20f, fg, bold = true).withTop(32))
-        col.addView(primary("Criar canal neste celular") { start(asHost = true, server = "", code = "") }.withTop(10))
-        col.addView(label("Este celular vira a central. Os outros entram nele.", 13f, muted).withTop(6))
+        col.addView(primary("Criar canal neste celular") { start(asHost = true, server = "", code = "", key = localKey()) }.withTop(10))
+        col.addView(label("Este celular vira a central. Os outros entram nele com a senha que aparece na tela dela.", 13f, muted).withTop(6))
 
         col.addView(label("Canais encontrados", 15f, fg, bold = true).withTop(28))
         foundList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -205,7 +243,7 @@ class MainActivity : Activity() {
             if (ip.isEmpty()) joinError.text = "Digite o endereço que aparece na tela da central."
             else {
                 prefs.edit().putString("ip", ip).apply()
-                start(asHost = false, server = ip, code = "")
+                askLocalKey { key -> start(asHost = false, server = ip, code = "", key = key) }
             }
         }, LinearLayout.LayoutParams(-2, -1).apply { marginStart = dp(8) })
         col.addView(row.withTop(8))
@@ -246,7 +284,7 @@ class MainActivity : Activity() {
         foundList.removeAllViews()
         foundEmpty.visibility = if (found.isEmpty()) View.VISIBLE else View.GONE
         for (f in found.values) {
-            foundList.addView(secondary("Entrar no canal de ${f.name}") { start(asHost = false, server = "udp://${f.host}:${f.port}", code = "") }.withTop(6))
+            foundList.addView(secondary("Entrar no canal de ${f.name}") { askLocalKey { key -> start(asHost = false, server = "udp://${f.host}:${f.port}", code = "", key = key) } }.withTop(6))
         }
     }
 
@@ -255,6 +293,41 @@ class MainActivity : Activity() {
     // ======================================================================
 
     private fun serverValue(): String = serverInput.text.toString().trim()
+
+    private fun onTitleTap() {
+        val now = System.currentTimeMillis()
+        titleTaps = if (now - lastTitleTap < 1500) titleTaps + 1 else 1
+        lastTitleTap = now
+        if (titleTaps < 7) return
+        titleTaps = 0
+        val show = advanced.visibility != View.VISIBLE
+        advanced.visibility = if (show) View.VISIBLE else View.GONE
+        prefs.edit().putBoolean("avancado", show).apply()
+        Toast.makeText(this, if (show) "Opções avançadas abertas" else "Opções avançadas escondidas", Toast.LENGTH_SHORT).show()
+    }
+
+    /** Senha da central no Wi-Fi local: criada uma vez e mostrada na tela do canal. */
+    private fun localKey(): String =
+        prefs.getString("senhaLocal", null) ?: Seguranca.novaSenhaLocal().also { prefs.edit().putString("senhaLocal", it).apply() }
+
+    /** Pede a senha que aparece na tela da central antes de entrar no Wi-Fi local. */
+    private fun askLocalKey(then: (String) -> Unit) {
+        val field = input("ex.: K7QX4M").apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+            setText(prefs.getString("senhaLocalDigitada", ""))
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Senha da central")
+            .setMessage("Está na tela do celular que criou o canal.")
+            .setView(LinearLayout(this).apply { setPadding(dp(20), dp(8), dp(20), 0); addView(field) })
+            .setPositiveButton("Entrar") { _, _ ->
+                val key = field.text.toString().trim().uppercase()
+                prefs.edit().putString("senhaLocalDigitada", key).apply()
+                then(key)
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
 
     /** Senha guardada para este código de canal (vem no convite ou foi criada aqui). */
     private fun keyFor(code: String): String =
@@ -278,7 +351,7 @@ class MainActivity : Activity() {
         if (server.isEmpty()) { joinError.text = "Preencha o endereço do servidor antes de criar o canal."; return }
         if (nameInput.text.toString().isBlank()) { joinError.text = "Digite seu nome primeiro."; return }
         val code = Protocol.newChannelCode()
-        saveKey(code, Protocol.newChannelCode()) // senha do canal: vai junto no convite
+        saveKey(code, Seguranca.novaSenha()) // senha do canal: vai junto no convite, ninguém digita
         codeInput.setText(code)
         shareInvite(server, code)
         joinInternet()
@@ -331,7 +404,7 @@ class MainActivity : Activity() {
         handleInvite(intent)
     }
 
-    private fun start(asHost: Boolean, server: String, code: String) {
+    private fun start(asHost: Boolean, server: String, code: String, key: String = keyFor(code)) {
         val name = nameInput.text.toString().trim()
         if (name.isEmpty()) { joinError.text = "Digite seu nome para a equipe saber quem está falando."; return }
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
@@ -342,6 +415,7 @@ class MainActivity : Activity() {
         joinError.text = ""
         joinError.setTextColor(tally)
         prefs.edit().putString("nome", name).putBoolean("btMic", btMic.isChecked)
+            .putString("admin", adminInput.text.toString().trim())
             .putBoolean("prioridade", priorityBox.isChecked).apply()
         discovery.stopSearching()
         val i = Intent(this, IntercomService::class.java)
@@ -351,7 +425,8 @@ class MainActivity : Activity() {
             .putExtra(IntercomService.EXTRA_CODE, code)
             .putExtra(IntercomService.EXTRA_BT_MIC, btMic.isChecked)
             .putExtra(IntercomService.EXTRA_PRIORITY, priorityBox.isChecked)
-            .putExtra(IntercomService.EXTRA_KEY, keyFor(code))
+            .putExtra(IntercomService.EXTRA_KEY, key)
+            .putExtra(IntercomService.EXTRA_ADMIN, adminInput.text.toString().trim())
         startForegroundService(i)
         ui.postDelayed({ applySavedSettings() }, 300)
     }

@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 300" width="800" height="300" role="img" aria-label="Como a equipe entra: a produção cria o canal, manda o convite pelo WhatsApp, cada pessoa abre a página e o app entra no canal">
+  <style>
+    text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: #eef1f3; }
+    .t { font-size: 22px; font-weight: 800; }
+    .n { font-size: 15px; font-weight: 800; fill: #22262b; }
+    .b { font-size: 15px; font-weight: 700; }
+    .s { font-size: 12.5px; fill: #a3abb3; }
+    .box { fill: #2d3238; stroke: #3e454d; stroke-width: 1.5; }
+    .ln { stroke: #a3abb3; stroke-width: 2; fill: none; }
+  </style>
+  <defs>
+    <marker id="seta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#a3abb3"/>
+    </marker>
+  </defs>
+  <rect width="800" height="300" rx="18" fill="#22262b"/>
+  <text x="32" y="46" class="t">Como a equipe entra no canal</text>
+  <text x="32" y="70" class="s">Ninguém digita servidor, código ou senha: tudo vai no link.</text>
+
+  <g transform="translate(32,100)">
+    <rect width="164" height="160" rx="12" class="box"/>
+    <circle cx="26" cy="28" r="14" fill="#e5323f"/><text x="26" y="33" text-anchor="middle" class="n" style="fill:#fff">1</text>
+    <text x="16" y="72" class="b">A produção cria</text>
+    <text x="16" y="92" class="b">o canal</text>
+    <text x="16" y="118" class="s">"Criar canal novo e</text>
+    <text x="16" y="135" class="s">convidar a equipe"</text>
+    <text x="16" y="152" class="s">gera código e senha</text>
+  </g>
+  <path d="M200,180 L222,180" class="ln" marker-end="url(#seta)"/>
+  <g transform="translate(226,100)">
+    <rect width="164" height="160" rx="12" class="box"/>
+    <circle cx="26" cy="28" r="14" fill="#f2a516"/><text x="26" y="33" text-anchor="middle" class="n">2</text>
+    <text x="16" y="72" class="b">Convite pelo</text>
+    <text x="16" y="92" class="b">WhatsApp</text>
+    <text x="16" y="118" class="s">…workers.dev/c/K7QX4M</text>
+    <text x="16" y="135" class="s">com prévia, logo e o</text>
+    <text x="16" y="152" class="s">código do canal</text>
+  </g>
+  <path d="M394,180 L416,180" class="ln" marker-end="url(#seta)"/>
+  <g transform="translate(420,100)">
+    <rect width="164" height="160" rx="12" class="box"/>
+    <circle cx="26" cy="28" r="14" fill="#f2a516"/><text x="26" y="33" text-anchor="middle" class="n">3</text>
+    <text x="16" y="72" class="b">Página do</text>
+    <text x="16" y="92" class="b">convite</text>
+    <text x="16" y="118" class="s">"Abrir no Comunicador"</text>
+    <text x="16" y="135" class="s">ou "Baixar o app" para</text>
+    <text x="16" y="152" class="s">quem ainda não tem</text>
+  </g>
+  <path d="M588,180 L610,180" class="ln" marker-end="url(#seta)"/>
+  <g transform="translate(614,100)">
+    <rect width="154" height="160" rx="12" class="box" style="stroke:#e5323f;stroke-width:2"/>
+    <circle cx="26" cy="28" r="14" fill="#e5323f"/><text x="26" y="33" text-anchor="middle" class="n" style="fill:#fff">4</text>
+    <text x="16" y="72" class="b">No canal</text>
+    <text x="16" y="98" class="s">o app abre preenchido;</text>
+    <text x="16" y="115" class="s">a pessoa digita o nome,</text>
+    <text x="16" y="132" class="s">entra, põe o fone e</text>
+    <text x="16" y="149" class="s">trava o celular</text>
+  </g>
+</svg>

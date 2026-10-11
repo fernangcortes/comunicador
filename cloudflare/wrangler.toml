@@ -11,6 +11,7 @@ APP_URL = "https://github.com/fernangcortes/comunicador/releases/latest/download
 [[rules]]
 type = "Data"
 globs = ["**/*.png"]
+fallthrough = true
 
 [[durable_objects.bindings]]
 name = "CANAL"

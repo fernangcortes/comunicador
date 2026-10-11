@@ -55,12 +55,14 @@ class IntercomService : Service() {
         const val EXTRA_CODE = "code"
         const val EXTRA_BT_MIC = "btMic"
         const val EXTRA_KEY = "key"
+        const val EXTRA_ADMIN = "admin"
         const val EXTRA_PRIORITY = "priority"
 
         private const val NOTIF_ID = 7
         private const val CHANNEL_ID = "comunicador"
         private const val VOX_HOLD_MS = 700L
         private const val MEMBER_TIMEOUT_MS = 6000L
+        private const val LOCAL = "LOCAL" // "código" usado para derivar as chaves no Wi-Fi local
 
         @Volatile var instance: IntercomService? = null
             private set
@@ -112,6 +114,8 @@ class IntercomService : Service() {
 
     private var rtc: RtcVoice? = null               // só no modo WebRTC
     private var channelKey = ""                      // senha do canal (vem no convite)
+    private var chaves: Seguranca.Chaves? = null     // prova de entrada e chave da voz, derivadas da senha
+    private var adminCode = ""                       // código de administrador (para criar canal)
     @Volatile var myPriority = false; private set    // direção/produção: os outros abaixam quando eu falo
     /** true quando o servidor recusou a senha do canal. */
     @Volatile var keyRejected = false; private set
@@ -176,6 +180,7 @@ class IntercomService : Service() {
         myName = intent.getStringExtra(EXTRA_NAME)?.trim().orEmpty().ifEmpty { "Sem nome" }
         useBtMic = intent.getBooleanExtra(EXTRA_BT_MIC, false)
         channelKey = intent.getStringExtra(EXTRA_KEY).orEmpty()
+        adminCode = intent.getStringExtra(EXTRA_ADMIN).orEmpty()
         myPriority = intent.getBooleanExtra(EXTRA_PRIORITY, false)
         keyRejected = false
         isHost = intent.action == ACTION_HOST
@@ -199,15 +204,18 @@ class IntercomService : Service() {
             }
             myId = Protocol.HOST_ID
             channelCode = ""
+            chaves = Seguranca.derivar(channelKey, LOCAL)
             routeLabel = "Wi-Fi local"
             val ips = Protocol.localAddresses()
             hostLabel = if (ips.isEmpty()) "Sem Wi-Fi. Ligue o Wi-Fi ou o hotspot." else "Central em " + ips.joinToString(" · ")
+            if (channelKey.isNotEmpty()) hostLabel += " · senha $channelKey"
             connectedToHost = true
             discovery = Discovery(this).also { it.announce(myName, Protocol.PORT) }
         } else {
             // Participante: central no Wi-Fi local, servidor próprio ou Cloudflare.
             val server = intent.getStringExtra(EXTRA_SERVER).orEmpty().trim()
             channelCode = intent.getStringExtra(EXTRA_CODE).orEmpty().uppercase()
+            chaves = Seguranca.derivar(channelKey, channelCode.ifEmpty { LOCAL })
             val webrtc = server.startsWith("webrtc://")
             routeLabel = when {
                 webrtc -> "Cloudflare WebRTC"
@@ -226,7 +234,7 @@ class IntercomService : Service() {
                     context = this,
                     api = "https://$host",
                     code = channelCode,
-                    key = channelKey,
+                    key = chaves?.entrada.orEmpty(),
                     onMicSamples = ::onRtcSamples,
                     sendSignal = { packet -> link?.send(packet) },
                 ).also { it.start() }
@@ -517,13 +525,25 @@ class IntercomService : Service() {
                 null
             }
         } ?: listOf(Protocol.audio(id, seq, pcm, encoder))
-        for (packet in packets) {
+        val voz = chaves?.voz
+        for (plain in packets) {
+            val packet = if (voz != null) Seguranca.cifrar(plain, voz) else plain
             if (isHost) for (m in members.values) send(packet, m.addr) else link?.send(packet)
         }
     }
 
-    /** Descomprime um pacote de áudio (Opus ou ADPCM) e entrega ao mixer. */
-    private fun playPacket(id: Int, data: ByteArray, len: Int) {
+    /** Decifra (se for o caso), descomprime (Opus ou ADPCM) e entrega ao mixer. */
+    private fun playPacket(id: Int, packet: ByteArray, length: Int) {
+        val voz = chaves?.voz
+        var data = packet
+        var len = length
+        if (voz != null) {
+            // Canal com senha: só toca o que foi cifrado com a chave do canal.
+            data = Seguranca.decifrar(packet, length, voz) ?: return
+            len = data.size
+        } else if (Seguranca.cifrado(packet, length)) {
+            return
+        }
         if (Protocol.audioCodec(data, len) == Protocol.CODEC_OPUS) {
             for (f in opusDec.decode(id, data, Protocol.AUDIO_HEADER, len - Protocol.AUDIO_HEADER)) mixer.push(id, f)
         } else {
@@ -538,8 +558,11 @@ class IntercomService : Service() {
 
     // ---- participante ----
 
+    private fun helloPacket(): ByteArray =
+        Protocol.hello(myName, channelCode, chaves?.entrada.orEmpty(), myPriority, Seguranca.provaAdmin(adminCode, channelCode))
+
     private fun onLinkConnected() {
-        link?.send(Protocol.hello(myName, channelCode, channelKey, myPriority))
+        link?.send(helloPacket())
         if (transmitting) link?.send(Protocol.talk(true))
         rtc?.publishedPacket?.let { link?.send(it) } // o canal esquece quem caiu; avisa de novo onde nos ouvir
         updateNotification()
@@ -575,9 +598,13 @@ class IntercomService : Service() {
                 rtc?.onPublications(list)
             }
             Protocol.ERROR -> {
-                if (len > 1 && data[1].toInt() == Protocol.ERR_WRONG_KEY && !keyRejected) {
+                val reason = if (len > 1) data[1].toInt() else 0
+                if ((reason == Protocol.ERR_WRONG_KEY || reason == Protocol.ERR_NEED_ADMIN) && !keyRejected) {
                     keyRejected = true
-                    hostLabel = "Senha do canal errada. Entre pelo link do convite."
+                    hostLabel = if (reason == Protocol.ERR_NEED_ADMIN)
+                        "Este canal não está aberto. Só quem tem o código de administrador cria canais."
+                    else if (channelCode.isEmpty()) "Senha errada. Confira a senha na tela da central."
+                    else "Senha do canal errada. Entre pelo link do convite."
                     updateNotification()
                 }
             }
@@ -626,6 +653,13 @@ class IntercomService : Service() {
                     Member(nextMemberId, from).also { nextMemberId = if (nextMemberId >= 65000) 2 else nextMemberId + 1 }
                 }
                 val h = Protocol.parseHello(data, len)
+                val c = chaves
+                if (c != null && h.key != c.entrada) {
+                    // Senha errada: não entra nem ouve.
+                    members.remove(from)
+                    send(Protocol.error(Protocol.ERR_WRONG_KEY), from)
+                    return
+                }
                 if (h.name != m.name) { m.name = h.name; isNew = true }
                 if (h.priority != m.priority) { m.priority = h.priority; isNew = true }
                 m.lastSeen = now
@@ -693,7 +727,7 @@ class IntercomService : Service() {
         } else {
             val l = link ?: return
             if (l.helloKeepalive) {
-                if (ticks % 2 == 0) l.send(Protocol.hello(myName, channelCode, channelKey, myPriority))
+                if (ticks % 2 == 0) l.send(helloPacket())
             } else if (ticks % 15 == 0) {
                 l.keepalive()
             }

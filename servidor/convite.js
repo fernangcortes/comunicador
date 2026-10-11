@@ -58,6 +58,7 @@ main{max-width:380px;width:100%}h1{font-size:30px;line-height:1.1;margin:14px 0 
 a{display:block;text-align:center;text-decoration:none;border-radius:12px;padding:16px;font-weight:700;margin-top:12px}
 .pri{background:#eef1f3;color:#22262b}.sec{border:1px solid #3e454d;color:#eef1f3}
 .muted{color:#98a2ad;font-size:15px}
+a.link{display:inline;padding:0;margin:0;border-radius:0;font-weight:inherit;text-align:inherit;color:#f2a516;text-decoration:underline}
 ${LOGO_CSS}`;
 
 const attr = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
@@ -136,7 +137,51 @@ ${baixar}
 <li><span><b>Mande o convite pelo WhatsApp.</b> Quem tocar no link entra direto no canal.</span></li>
 </ol>
 ${rodape ? `<p class="rodape">${rodape}</p>` : ""}
+<p class="rodape"><a class="link" href="/privacidade">Privacidade</a></p>
 </main></body></html>`;
 }
 
-module.exports = { invitePage, homePage };
+// Política de privacidade (a Google Play exige um endereço público para ela).
+function privacyPage(origin = "") {
+  const titulo = "Privacidade · Comunicador";
+  const descricao = "O que o Comunicador usa, o que passa pela central e o que não é guardado.";
+  return `<!doctype html><html lang="pt-BR"><head>
+${cabecalho(titulo, descricao, origin)}
+<style>${BASE_CSS}
+body{place-items:start center}main{max-width:640px}
+h2{font-size:20px;margin:28px 0 6px}p,li{color:#d5dade;font-size:16px}ul{padding-left:20px}
+</style></head><body><main>
+${logoAnimada(56)}
+<h1>Privacidade</h1>
+<p class="muted">Comunicador de set · atualizada em 11 de outubro de 2026</p>
+
+<h2>Em resumo</h2>
+<p>O Comunicador é um intercom de voz para equipes de filmagem. Ele não tem contas, anúncios nem ferramentas de análise, não grava conversas e não vende nem compartilha dados.</p>
+
+<h2>O que o app usa no celular</h2>
+<ul>
+<li><b>Microfone:</b> só enquanto você está num canal, para transmitir a sua voz quando você fala (botão ou modo por voz). Com a tela travada, ele continua funcionando por um serviço em primeiro plano, sempre com um aviso fixo na notificação.</li>
+<li><b>Bluetooth:</b> para o fone e para o botão PTT opcional.</li>
+<li><b>Notificações:</b> para o aviso fixo enquanto o comunicador está ligado.</li>
+<li><b>Rede:</b> para falar com a central (Wi-Fi local, servidor próprio ou Cloudflare).</li>
+</ul>
+<p>O teste de áudio grava 3 segundos, toca de volta e apaga. Essa gravação nunca sai do celular.</p>
+
+<h2>O que passa pela central</h2>
+<ul>
+<li>O nome ou função que você digitou, o código do canal e se você está falando ou tem prioridade. Isso serve para mostrar a lista de pessoas do canal e some quando você sai.</li>
+<li>Uma "prova de entrada" calculada a partir da senha do canal. A senha em si nunca sai do celular. A central guarda essa prova para conferir quem chega depois.</li>
+<li><b>A sua voz, em tempo real, sem gravação.</b> No Wi-Fi local, no servidor próprio e no modo WebSocket da Cloudflare, ela vai cifrada de ponta a ponta: a central só repassa e não consegue ouvir. No modo WebRTC, ela passa pelo Cloudflare Realtime, cifrada no caminho e sem gravação.</li>
+</ul>
+<p>A central da Cloudflare funciona na infraestrutura da Cloudflare, que pode registrar dados técnicos de conexão, como o endereço IP, conforme a <a class="link" href="https://www.cloudflare.com/privacypolicy/">política de privacidade da Cloudflare</a>.</p>
+
+<h2>O que fica no seu celular</h2>
+<p>O seu nome, as preferências do app, a senha do canal em que você entrou e, se você for da produção, o código de administrador. Desinstalar o app apaga tudo.</p>
+
+<h2>Contato</h2>
+<p>Dúvidas ou pedidos: abra uma conversa em <a class="link" href="https://github.com/fernangcortes/comunicador/issues">github.com/fernangcortes/comunicador/issues</a>.</p>
+<p><a class="sec" href="/">Voltar</a></p>
+</main></body></html>`;
+}
+
+module.exports = { invitePage, homePage, privacyPage };

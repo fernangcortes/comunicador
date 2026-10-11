@@ -1,21 +1,45 @@
-# Gera o APK do Comunicador na nuvem, sem precisar de Android Studio.
-#  - A cada envio para a branch main: o APK fica em Actions > (a execução) > Artifacts.
-#  - Ao criar uma tag v0.5, v0.6...: o APK vira uma "Release" com link fixo de download,
+# Testa e gera o APK do Comunicador na nuvem, sem precisar de Android Studio.
+#  - A cada envio para a branch main: roda os testes e o APK fica em Actions > (a execução) > Artifacts.
+#  - Ao criar uma tag v0.9, v1.0...: o APK vira uma "Release" com link fixo de download,
 #    que pode ir no WhatsApp ou na página de convite:
-#    https://github.com/SEU_USUARIO/SEU_REPOSITORIO/releases/latest/download/comunicador.apk
+#    https://github.com/fernangcortes/comunicador/releases/latest/download/comunicador.apk
+#  - O APK é assinado com a chave definitiva, guardada nos segredos do repositório
+#    (ANDROID_KEYSTORE_BASE64 e ANDROID_KEYSTORE_PASSWORD). Ela nunca fica no código.
 name: Gerar APK
 
 on:
   push:
     branches: [main]
     tags: ["v*"]
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  testes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Testar o servidor próprio
+        run: node --test servidor/teste.mjs
+
+      - name: Testar a central da Cloudflare (wrangler dev local)
+        working-directory: cloudflare
+        run: |
+          npm ci
+          node --test teste.mjs
+
   apk:
+    needs: testes
     runs-on: ubuntu-latest
     steps:
       - name: Baixar o código
@@ -27,14 +51,31 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Gradle 8.7
+      - name: Gradle (versão definida em gradle/wrapper)
         uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.7"
+
+      - name: Chave de assinatura
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/comunicador.p12"
+            echo "COMUNICADOR_KEYSTORE=$RUNNER_TEMP/comunicador.p12" >> "$GITHUB_ENV"
+            echo "COMUNICADOR_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "::error::Sem a chave definitiva nos segredos: a Release não pode sair com a chave de teste."
+            exit 1
+          else
+            echo "::warning::Sem a chave definitiva (ex.: pull request de outra pessoa): APK assinado com a chave de teste."
+          fi
+
+      - name: Testes do app (protocolo, ADPCM e criptografia)
+        run: ./gradlew testReleaseUnitTest --no-daemon
 
       - name: Compilar o app
         run: |
-          gradle assembleRelease --no-daemon
+          ./gradlew assembleRelease --no-daemon
           cp app/build/outputs/apk/release/app-release.apk comunicador.apk
 
       - name: Guardar o APK desta execução
