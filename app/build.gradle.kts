@@ -46,6 +46,8 @@ android {
     buildTypes {
         debug {
             signingConfig = signingConfigs.getByName("teste")
+            // Versão de depuração também roda no emulador do computador (x86_64).
+            ndk { abiFilters += "x86_64" }
         }
         release {
             isMinifyEnabled = false
