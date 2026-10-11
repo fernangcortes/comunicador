@@ -214,6 +214,7 @@ class MainActivity : Activity() {
         advanced.addView(label("Código de administrador", 15f, fg, bold = true).withTop(14))
         adminInput = input("só para quem cria canais").apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            typeface = Typeface.DEFAULT // campo de senha troca a fonte por uma de máquina de escrever
             setText(prefs.getString("admin", ""))
         }
         advanced.addView(adminInput.withTop(8))
@@ -427,8 +428,19 @@ class MainActivity : Activity() {
             .putExtra(IntercomService.EXTRA_PRIORITY, priorityBox.isChecked)
             .putExtra(IntercomService.EXTRA_KEY, key)
             .putExtra(IntercomService.EXTRA_ADMIN, adminInput.text.toString().trim())
-        startForegroundService(i)
-        ui.postDelayed({ applySavedSettings() }, 300)
+        // As chaves do canal levam uma fração de segundo para sair da senha: calcula fora da
+        // tela (fica guardado) e só então liga o serviço, que já as encontra prontas.
+        joinError.setTextColor(muted)
+        joinError.text = "Preparando…"
+        Thread {
+            Seguranca.derivar(key, code.uppercase().ifEmpty { "LOCAL" })
+            ui.post {
+                if (joinError.text == "Preparando…") joinError.text = ""
+                joinError.setTextColor(tally)
+                startForegroundService(i)
+                ui.postDelayed({ applySavedSettings() }, 300)
+            }
+        }.start()
     }
 
     private fun applySavedSettings() {
@@ -564,7 +576,7 @@ class MainActivity : Activity() {
         if (!inRoom || s == null) return
 
         val connected = s.connectedToHost
-        statusDot.background = circle(if (connected) ok else tally)
+        statusDot.background = circle(if (connected && !s.keyRejected) ok else tally)
         statusText.text = when {
             s.keyRejected -> s.hostLabel
             s.isHost -> "${s.hostLabel} · ${s.codecLabel}"

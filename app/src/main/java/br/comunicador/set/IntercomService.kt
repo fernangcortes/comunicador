@@ -113,6 +113,7 @@ class IntercomService : Service() {
     private var bridgeWasTx = false
 
     private var rtc: RtcVoice? = null               // só no modo WebRTC
+    private var rtcStarted = false                   // o WebRTC só liga depois de entrar no canal
     private var channelKey = ""                      // senha do canal (vem no convite)
     private var chaves: Seguranca.Chaves? = null     // prova de entrada e chave da voz, derivadas da senha
     private var adminCode = ""                       // código de administrador (para criar canal)
@@ -183,6 +184,7 @@ class IntercomService : Service() {
         adminCode = intent.getStringExtra(EXTRA_ADMIN).orEmpty()
         myPriority = intent.getBooleanExtra(EXTRA_PRIORITY, false)
         keyRejected = false
+        rtcStarted = false
         isHost = intent.action == ACTION_HOST
         mixer.clear()
         members.clear()
@@ -219,7 +221,7 @@ class IntercomService : Service() {
             val webrtc = server.startsWith("webrtc://")
             routeLabel = when {
                 webrtc -> "Cloudflare WebRTC"
-                server.startsWith("wss://") || server.startsWith("https://") -> "Cloudflare"
+                server.startsWith("wss://") || server.startsWith("https://") || server.startsWith("ws://") -> "Cloudflare"
                 channelCode.isNotEmpty() -> "Servidor"
                 else -> "Wi-Fi local"
             }
@@ -237,7 +239,9 @@ class IntercomService : Service() {
                     key = chaves?.entrada.orEmpty(),
                     onMicSamples = ::onRtcSamples,
                     sendSignal = { packet -> link?.send(packet) },
-                ).also { it.start() }
+                )
+                // Liga quando chegar a primeira lista de pessoas: antes disso a central ainda
+                // não conhece a senha e recusaria o WebRTC ("canal vazio").
             }
         }
 
@@ -573,6 +577,7 @@ class IntercomService : Service() {
         when (data[0]) {
             Protocol.ROSTER -> {
                 val (me, list) = Protocol.parseRoster(data, len)
+                if (!rtcStarted) { rtcStarted = true; rtc?.start() } // já entramos no canal
                 myId = me
                 people = list
                 updateBridgeNeeded()
@@ -601,6 +606,8 @@ class IntercomService : Service() {
                 val reason = if (len > 1) data[1].toInt() else 0
                 if ((reason == Protocol.ERR_WRONG_KEY || reason == Protocol.ERR_NEED_ADMIN) && !keyRejected) {
                     keyRejected = true
+                    // Sem entrada no canal, o WebRTC também seria recusado: para de tentar.
+                    rtc?.close(); rtc = null
                     hostLabel = if (reason == Protocol.ERR_NEED_ADMIN)
                         "Este canal não está aberto. Só quem tem o código de administrador cria canais."
                     else if (channelCode.isEmpty()) "Senha errada. Confira a senha na tela da central."

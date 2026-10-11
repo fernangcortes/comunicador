@@ -3,9 +3,7 @@ package br.comunicador.set
 import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.Mac
-import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
-import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
 /**
@@ -30,16 +28,41 @@ object Seguranca {
 
     class Chaves(val entrada: String, val voz: ByteArray)
 
-    /** Deriva as chaves do canal. Sem senha, não há chaves (canal aberto, como antes). */
+    private val cache = HashMap<String, Chaves>()
+
+    /**
+     * Deriva as chaves do canal. Sem senha, não há chaves (canal aberto, como antes).
+     * Leva uma fração de segundo de propósito: chame fora da tela (MainActivity faz isso antes
+     * de ligar o serviço) e o resultado fica guardado.
+     */
     fun derivar(senha: String, codigo: String): Chaves? {
         if (senha.isEmpty()) return null
+        val id = "$senha\u0000${codigo.uppercase()}"
+        synchronized(cache) { cache[id]?.let { return it } }
         // PBKDF2 deixa caro adivinhar a senha a partir de um pacote capturado.
-        val spec = PBEKeySpec(senha.toCharArray(), "comunicador/canal/${codigo.uppercase()}".toByteArray(), ITERACOES, 256)
-        val mestra = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
-        return Chaves(
+        val mestra = pbkdf2(senha.toByteArray(), "comunicador/canal/${codigo.uppercase()}".toByteArray(), ITERACOES)
+        val c = Chaves(
             entrada = hex(hmac(mestra, "entrada")).take(32),
             voz = hmac(mestra, "voz"),
         )
+        synchronized(cache) { cache[id] = c }
+        return c
+    }
+
+    /**
+     * PBKDF2-HMAC-SHA256 com 32 bytes de saída (um bloco). Feito aqui, com o HMAC nativo do
+     * sistema, porque o PBKDF2 que vem no Android é escrito em Java e chega a levar segundos.
+     */
+    private fun pbkdf2(senha: ByteArray, sal: ByteArray, iteracoes: Int): ByteArray {
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(senha, "HmacSHA256"))
+        var u = mac.doFinal(sal + byteArrayOf(0, 0, 0, 1))
+        val t = u.copyOf()
+        repeat(iteracoes - 1) {
+            u = mac.doFinal(u)
+            for (i in t.indices) t[i] = (t[i].toInt() xor u[i].toInt()).toByte()
+        }
+        return t
     }
 
     /** Prova de que quem cria o canal tem o código de administrador da central. */
