@@ -75,15 +75,26 @@ async function rtc(env, action, request) {
   if (!env.SFU_APP_ID || !env.SFU_TOKEN) {
     return json({ erro: "WebRTC não configurado neste servidor (faltam SFU_APP_ID e SFU_TOKEN)" }, 501);
   }
-  const base = `${env.SFU_BASE || "https://rtc.live.cloudflare.com"}/v1/apps/${env.SFU_APP_ID}`;
+  // trim(): um espaço ou quebra de linha colado junto com a chave faz o SFU recusar o pedido.
+  const appId = env.SFU_APP_ID.trim();
+  const token = env.SFU_TOKEN.trim();
+  const base = `${env.SFU_BASE || "https://rtc.live.cloudflare.com"}/v1/apps/${appId}`;
   const call = async (method, path, body) => {
+    // Sem corpo, não anuncia JSON: o SFU recusa (400) um pedido JSON vazio.
+    const headers = { Authorization: `Bearer ${token}` };
+    if (body !== undefined) headers["Content-Type"] = "application/json";
     const r = await fetch(base + path, {
       method,
-      headers: { Authorization: `Bearer ${env.SFU_TOKEN}`, "Content-Type": "application/json" },
+      headers,
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok || data.errorCode) throw new Error(data.errorDescription || data.errorCode || `SFU respondeu ${r.status}`);
+    const text = await r.text();
+    let data = {};
+    try { data = JSON.parse(text); } catch {}
+    if (!r.ok || data.errorCode) {
+      throw new Error(data.errorDescription || data.errorCode || `SFU respondeu ${r.status}: ${text.slice(0, 200)}` +
+        (/^[0-9a-f]{32}$/.test(appId) ? "" : " (o SFU_APP_ID não parece um App ID: confira se não foi colado o App Secret)"));
+    }
     return data;
   };
 
