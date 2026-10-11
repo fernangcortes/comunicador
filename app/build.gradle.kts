@@ -13,8 +13,8 @@ android {
         targetSdk = 34
         // O WebRTC traz bibliotecas nativas; só as dos celulares atuais (ARM) para o APK não pesar.
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
-        versionCode = 7
-        versionName = "0.7"
+        versionCode = 8
+        versionName = "0.8"
     }
 
     // Chave de assinatura fixa, guardada no projeto. Sem ela, cada APK gerado no GitHub
